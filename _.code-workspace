@@ -1,0 +1,31 @@
+{
+	"folders": [
+		{
+			"name": "--site--",
+			"path": "."
+		},
+		{
+			"name": "--xdbg--",
+			"path": "C:/xampp/.setup/php_current__xdbg"
+		}
+	],
+	"settings": {
+		"window.title": "[ pax-one (package) ] / ${folderName} ",
+		"files.exclude": {
+			"**/desktop.ini": true,
+			"**/server-*.log": true,
+		},	
+		"workbench.colorCustomizations": {
+			"sideBar.background": "#202733",
+			"settings.headerBorder": "#d68b8b",
+			"statusBar.background": "#333",
+			"activityBar.background": "#325369",
+			"activityBar.inactiveForeground": "#a18c8c",
+			//"titleBar.activeBackground": "#6b8b58",
+			//"titleBar.activeForeground": "#dad1e7",
+			"icon.foreground": "#00ddff",
+			"symbolIcon.colorForeground": "#a77d7d",
+			"icon.colorForeground": "#ff0000",
+		}
+	}	
+}
