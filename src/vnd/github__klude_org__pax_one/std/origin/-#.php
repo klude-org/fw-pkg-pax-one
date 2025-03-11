@@ -259,7 +259,7 @@ class origin extends \stdClass {
         if(($expr[0]??'')=='/' || ($expr[1]??'')==':'){
             return \str_replace('\\','/', \realpath($expr));
         } else if(\str_starts_with($expr, '[')) {
-            if(!\preg_match("#\[([^\]]+)\]\[([^\]]+)\]$#", \str_replace('~','/', $expr), $m)){
+            if(!\preg_match("#\[([^\]]*)\]\[([^\]]+)\]$#", \str_replace('~','/', $expr), $m)){
                 return false;
             }
             [$null, $m_path, $l_path] = $m;
@@ -309,7 +309,7 @@ class origin extends \stdClass {
                 }
                 $extracted = false;
                 $zip_offset = \substr($s = $zip->getNameIndex(0), 0, \strpos($s, '/'));
-                $sub_offset = "{$zip_offset}/{$m_path}";
+                $sub_offset = \rtrim("{$zip_offset}/{$m_path}",'/');
                 for ($i = 0; $i < $zip->numFiles; $i++) {
                     $fileName = $zip->getNameIndex($i);
                     if (\str_starts_with($fileName, $sub_offset)) {
