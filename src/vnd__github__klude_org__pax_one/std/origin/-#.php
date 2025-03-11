@@ -329,6 +329,82 @@ class origin extends \stdClass {
         }
     }
     
+    public function ensure_module($module){
+        //$module = ".local-[src~shell-win-0][github.com~klude-org~fw-pkg-pax-one~archive~refs~heads~main]";
+        if(!\preg_match("#.local-\[([^\]]+)\]\[([^\]]+)\]$#", \str_replace('~','/', $module), $m)){
+            return false;
+        }
+        [$null, $m_path, $l_path] = $m;
+        $lib_dir = \str_replace('\\','/', __DIR__);
+        $local_dir = \str_replace('\\','/', __DIR__.'/.local');
+
+        $l_name = \str_replace('/','~', $l_path);
+        $l_url = "https://{$l_path}.zip";
+        $l_zip = "{$local_dir}/{$l_name}-code.zip";
+
+        $m_name = \str_replace('/','~', $m_path);
+        $m_dir = "{$lib_dir}/.local-[{$m_name}][{$l_name}]";
+
+        try {
+            if(!\is_file($l_zip)){
+                \is_dir($d = \dirname($l_zip)) OR \mkdir($d, 0777, true);
+                if(!($ch = \curl_init($l_url))){
+                    throw new \Exception("Failed: Unable to initialze curl");
+                };
+                \curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
+                \curl_setopt($ch, CURLOPT_USERAGENT, 'PHP');
+                \curl_setopt($ch, CURLOPT_VERBOSE, false);
+                if(!($fp = \fopen($l_zip, 'w'))){
+                    throw new \Exception("Failed: Unable to open tempfile for writing");
+                };
+                \curl_setopt($ch, CURLOPT_FILE, $fp);
+                \curl_exec($ch);
+                if (\curl_errno($ch)) {
+                    throw new \Exception("Failed: cURL Error: " . \curl_error($ch));
+                }
+                if(($h = curl_getinfo($ch, CURLINFO_HTTP_CODE)) != 200){
+                    \is_file($l_zip) AND unlink($l_zip);
+                    throw new \Exception("Failed: Server responded with an {$h} error");
+                }
+                if(!\is_file($l_zip)){
+                    throw new \Exception("Failed: Unable to download file");
+                }
+            }
+        } finally {
+            empty($fp) OR \fclose($fp);
+            empty($ch) OR \curl_close($ch);
+        }
+        
+        try {
+            if (!(($zip = new \ZipArchive)->open($l_zip) === true)) {
+                throw new \Exception("Failed: Library couldn't be dowloaded");
+            }
+            $extracted = false;
+            $zip_offset = \substr($s = $zip->getNameIndex(0), 0, \strpos($s, '/'));
+            $sub_offset = "{$zip_offset}/{$m_path}";
+            for ($i = 0; $i < $zip->numFiles; $i++) {
+                $fileName = $zip->getNameIndex($i);
+                if (\str_starts_with($fileName, $sub_offset)) {
+                    $target_path = $m_dir.substr($fileName, strlen($sub_offset));
+                    if (str_ends_with($fileName, '/')) {
+                        is_dir($target_path) OR @mkdir($target_path, 0777, true);
+                    } else {
+                        is_dir(dirname($target_path)) OR @mkdir($d, 0777, true);
+                        file_put_contents($target_path, $zip->getFromIndex($i));
+                    }
+                    $extracted = true;
+                }
+            }
+            if(!$extracted){
+                throw new \Exception("Failed: Library couldn't be extracted");
+            }    
+        } finally {
+            $zip->close();
+        }
+        
+        return $m_dir;
+    }    
+    
     
     public function __invoke(){
         $this->build_request();
