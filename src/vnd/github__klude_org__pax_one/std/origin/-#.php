@@ -1,4 +1,4 @@
-<?php namespace vnd__github__klude_org__pax_one\std;
+<?php namespace vnd\pax_one__klude_org__github\std;
 
 class origin extends \stdClass {
     
