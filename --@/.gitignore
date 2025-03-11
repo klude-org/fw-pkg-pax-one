@@ -1,0 +1,24 @@
+# vnd directory is where all plugins and modules are kept
+/vnd
+
+# vnd directory is where all plugins and modules are kept
+**/none
+
+# enable (uncomment) the following line for live projects if you want the data folders to be ignored
+/.data
+/.data-*
+
+# anything that says .volatile is purely here
+# here in are the logs and caches
+**/.volatile
+**/.volatile-*
+
+# anything that says .local is for development and will not be committed (unless explicitly commited for sample purposes)
+# all questionable development can be done in .local and then put into modules as required
+# .local is also used to store local junk by applications
+**/.local
+**/.local-*
+
+# composer vendor packages are always hidden
+/composer/vendor/*
+/composer-*/vendor/*
