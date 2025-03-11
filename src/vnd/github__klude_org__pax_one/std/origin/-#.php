@@ -8,7 +8,7 @@ class origin extends \stdClass {
     public readonly string $INCP_DIR;
     public readonly string $INTFC;
     public readonly string $PANEL;
-    public readonly string $vnd_DIR;
+    public readonly string $LOCAL_DIR;
     public readonly array $ENV_VARS;
     public readonly bool $IS_CLI;
     public readonly bool $IS_WEB;
