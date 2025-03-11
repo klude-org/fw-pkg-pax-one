@@ -7,7 +7,8 @@ class origin extends \stdClass {
     public readonly string $LIB_DIR;
     public readonly string $INCP_DIR;
     public readonly string $INTFC;
-    public readonly string $LOCAL_DIR;
+    public readonly string $PANEL;
+    public readonly string $vnd_DIR;
     public readonly array $ENV_VARS;
     public readonly bool $IS_CLI;
     public readonly bool $IS_WEB;
@@ -20,10 +21,10 @@ class origin extends \stdClass {
     
     public static function _() { static $i;  return $i ?: ($i = new static()); }
     
-    protected function __construct(){
+    public function __construct(){
+        global $_;
         $this->ENV_VARS = $_ENV;
         $_ENV = $this;
-        $this->config($_);
         $this->_ = $_[\_::class] ?? [];
         $this->CONFIG = $_;
         $this->LIB_DIR = \_\LIB_DIR;
@@ -35,11 +36,12 @@ class origin extends \stdClass {
                 : 'web'
             )
         ;
+        $this->PANEL = $_SERVER['FY__PANEL'] ?? '';
         $this->LOCAL_DIR = \_\LIB_DIR.'/.local';
         \date_default_timezone_set($this->_['TIMEZONE'] ?? \getenv('FW_TIMEZONE') ?: 'Australia/Adelaide');
         \define('_\IS_CLI', $this->IS_CLI = ($this->INTFC === 'cli'));
         \define('_\IS_WEB', $this->IS_WEB = ($this->INTFC === 'web'));
-        \define('_\IS_API', $this->IS_API = ($this->INTFC === 'api'));
+        \define('_\IS_API', $this->IS_API = (!\_\IS_CLI && !\_\IS_WEB));
         \define('_\OB_OUT', $this->OB_OUT = \ob_get_level());
         $this->IS_WEB AND \ob_start();
         \define('_\OB_TOP', $this->OB_TOP = \ob_get_level());
@@ -52,11 +54,12 @@ class origin extends \stdClass {
                     foreach([
                         $this->_['*']['modules'] ?? [],
                         $this->_[$this->INTFC]['modules'] ?? [],
+                        $this->_[$this->INTFC.$this->PANEL]['modules'] ?? [],
                     ] as $m){
                         foreach($m as $expr => $en){
                             if($en){
                                 $found = false;
-                                if($f = $this->resolve($expr, $en)){
+                                if($f = $this->resolve_module($expr, $en)){
                                     $found = true;
                                     yield \str_replace('\\','/', \realpath($f)) => true;
                                 }
@@ -212,7 +215,7 @@ class origin extends \stdClass {
             empty($ch) OR \curl_close($ch);
         }
     }
-    protected function iterator($d){
+    public function iterator($d){
         return new \RecursiveIteratorIterator(
             new \RecursiveDirectoryIterator(
                 $d, 
@@ -220,11 +223,15 @@ class origin extends \stdClass {
             )
         );
     }
-    protected function liblist(){
+    public function liblist(){
         static $I; return $I ?? ($I= \array_keys(\iterator_to_array((function() {
             global $_;
             yield $this->INCP_DIR => true;
-            foreach($this->_['LIB']['*'] ?? [] as $dx => $en){
+            foreach([
+                $this->_['*']['libraries'] ?? [],
+                $this->_[$this->INTFC]['libraries'] ?? [],
+                $this->_[$this->INTFC.$this->PANEL]['libraries'] ?? [],
+            ] ?? [] as $dx => $en){
                 if($en){
                     if(\is_dir($dx)){
                         yield \str_replace('\\','/', \realpath($dx)) => true;
@@ -250,56 +257,65 @@ class origin extends \stdClass {
         })())));
     }
     
-    protected function resolve($expr){
+    public function resolve_module($expr){
         if(($expr[0]??'')=='/' || ($expr[1]??'')==':'){
             return \str_replace('\\','/', \realpath($expr));
         } else if(\str_starts_with($expr, '[')) {
-            if(!\preg_match('#^(?<lib>\[(?<url>[^\]]+)\])(?<sub>.*)#',$expr, $m)){
-                if($this->IS_CLI && $this->VERBOSITY){
-                    echo "Invalid library expression";
+            if(!\preg_match("#\[([^\]]+)\]\[([^\]]+)\]$#", \str_replace('~','/', $expr), $m)){
+                return false;
+            }
+            [$null, $m_path, $l_path] = $m;
+            $lib_dir = \str_replace('\\','/', $this->LIB_DIR);
+            $vnd_dir = \str_replace('\\','/', $this->LIB_DIR.'/vnd');
+    
+            $l_name = \str_replace('/','~', $l_path);
+            $l_url = "https://{$l_path}.zip";
+            $l_zip = "{$vnd_dir}/.local-code-{$l_name}.zip";
+    
+            $m_name = \str_replace('/','~', $m_path);
+            $m_dir = "{$vnd_dir}/[{$m_name}][{$l_name}]";
+    
+            try {
+                if(!\is_file($l_zip)){
+                    \is_dir($d = \dirname($l_zip)) OR \mkdir($d, 0777, true);
+                    if(!($ch = \curl_init($l_url))){
+                        throw new \Exception("Failed: Unable to initialze curl");
+                    };
+                    \curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
+                    \curl_setopt($ch, CURLOPT_USERAGENT, 'PHP');
+                    \curl_setopt($ch, CURLOPT_VERBOSE, false);
+                    if(!($fp = \fopen($l_zip, 'w'))){
+                        throw new \Exception("Failed: Unable to open tempfile for writing");
+                    };
+                    \curl_setopt($ch, CURLOPT_FILE, $fp);
+                    \curl_exec($ch);
+                    if (\curl_errno($ch)) {
+                        throw new \Exception("Failed: cURL Error: " . \curl_error($ch));
+                    }
+                    if(($h = curl_getinfo($ch, CURLINFO_HTTP_CODE)) != 200){
+                        \is_file($l_zip) AND unlink($l_zip);
+                        throw new \Exception("Failed: Server responded with an {$h} error");
+                    }
+                    if(!\is_file($l_zip)){
+                        throw new \Exception("Failed: Unable to download file");
+                    }
                 }
-                return;
+            } finally {
+                empty($fp) OR \fclose($fp);
+                empty($ch) OR \curl_close($ch);
             }
             
-            $m = \array_filter($m, fn($k) => !is_numeric($k), ARRAY_FILTER_USE_KEY);
-            $temp_id = \uniqid();
-            $libname = \str_replace('/','][', "lib-{$m['lib']}");
-            $subpath = \trim($m['sub'] ?? 'src', '/');
-            $subname = '['.\str_replace('/','][', $subpath).']';
-            $lib_dir = $this->LOCAL_DIR."/{$libname}";
-            $out_dir = "{$lib_dir}/{$subname}";
-            
-            if(!\is_dir($out_dir)){
-                $lib_url = "https://{$m['url']}.zip";
-                $lib_zip = $this->LOCAL_DIR."/{$libname}/code.zip";
-                if(!\is_file($lib_zip)){
-                    \is_dir($d = \dirname($lib_zip)) OR \mkdir($d, 0777, true);
-                    if(!$this->curl($lib_url, $lib_zip)){
-                        if($this->IS_CLI && $this->VERBOSITY){
-                            echo "\033[91mFailed: Library couldn't be dowloaded\033[0m\n";
-                        }
-                        return;
-                    }
-                    if($this->IS_CLI && $this->VERBOSITY){
-                        $sha = \sha1_file($lib_zip);
-                        echo "Library Downloaded: '{$lib_zip}' {$sha}\n";
-                    }
+            try {
+                if (!(($zip = new \ZipArchive)->open($l_zip) === true)) {
+                    throw new \Exception("Failed: Library couldn't be dowloaded");
                 }
-                
-                if (!(($zip = new \ZipArchive)->open($lib_zip) === true)) {
-                    if($this->IS_CLI && $this->VERBOSITY){
-                        echo "\033[91mFailed: Library couldn't be dowloaded\033[0m\n";
-                    }
-                    return;
-                }
-    
                 $extracted = false;
                 $zip_offset = \substr($s = $zip->getNameIndex(0), 0, \strpos($s, '/'));
-                $sub_offset = "{$zip_offset}/{$subpath}";
+                $sub_offset = "{$zip_offset}/{$m_path}";
                 for ($i = 0; $i < $zip->numFiles; $i++) {
                     $fileName = $zip->getNameIndex($i);
                     if (\str_starts_with($fileName, $sub_offset)) {
-                        $target_path = $out_dir.substr($fileName, strlen($sub_offset));
+                        $target_path = $m_dir.substr($fileName, strlen($sub_offset));
                         if (str_ends_with($fileName, '/')) {
                             is_dir($target_path) OR @mkdir($target_path, 0777, true);
                         } else {
@@ -309,18 +325,15 @@ class origin extends \stdClass {
                         $extracted = true;
                     }
                 }
-                
                 if(!$extracted){
-                    if($this->IS_CLI && $this->VERBOSITY){
-                        echo "\033[91mFailed: Library couldn't be dowloaded\033[0m\n";
-                    }
-                    return;
-                }
+                    throw new \Exception("Failed: Library couldn't be extracted");
+                }    
+            } finally {
+                $zip->close();
             }
-            if($this->IS_CLI && $this->VERBOSITY){
-                echo "\033[92mLibrary Path '{$out_dir}'\033[0m\n";
-            }
-            return $out_dir;
+            
+            return $m_dir;
+            
         } else {
             global $_;
             foreach($this->liblist() ?? [] as $d){
@@ -331,95 +344,20 @@ class origin extends \stdClass {
         }
     }
     
-    public function ensure_module($module){
-        //$module = ".local-[src~shell-win-0][github.com~klude-org~fw-pkg-pax-one~archive~refs~heads~main]";
-        if(!\preg_match("#.local-\[([^\]]+)\]\[([^\]]+)\]$#", \str_replace('~','/', $module), $m)){
-            return false;
-        }
-        [$null, $m_path, $l_path] = $m;
-        $lib_dir = \str_replace('\\','/', __DIR__);
-        $local_dir = \str_replace('\\','/', __DIR__.'/.local');
-
-        $l_name = \str_replace('/','~', $l_path);
-        $l_url = "https://{$l_path}.zip";
-        $l_zip = "{$local_dir}/{$l_name}-code.zip";
-
-        $m_name = \str_replace('/','~', $m_path);
-        $m_dir = "{$lib_dir}/.local-[{$m_name}][{$l_name}]";
-
-        try {
-            if(!\is_file($l_zip)){
-                \is_dir($d = \dirname($l_zip)) OR \mkdir($d, 0777, true);
-                if(!($ch = \curl_init($l_url))){
-                    throw new \Exception("Failed: Unable to initialze curl");
-                };
-                \curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
-                \curl_setopt($ch, CURLOPT_USERAGENT, 'PHP');
-                \curl_setopt($ch, CURLOPT_VERBOSE, false);
-                if(!($fp = \fopen($l_zip, 'w'))){
-                    throw new \Exception("Failed: Unable to open tempfile for writing");
-                };
-                \curl_setopt($ch, CURLOPT_FILE, $fp);
-                \curl_exec($ch);
-                if (\curl_errno($ch)) {
-                    throw new \Exception("Failed: cURL Error: " . \curl_error($ch));
-                }
-                if(($h = curl_getinfo($ch, CURLINFO_HTTP_CODE)) != 200){
-                    \is_file($l_zip) AND unlink($l_zip);
-                    throw new \Exception("Failed: Server responded with an {$h} error");
-                }
-                if(!\is_file($l_zip)){
-                    throw new \Exception("Failed: Unable to download file");
-                }
-            }
-        } finally {
-            empty($fp) OR \fclose($fp);
-            empty($ch) OR \curl_close($ch);
-        }
-        
-        try {
-            if (!(($zip = new \ZipArchive)->open($l_zip) === true)) {
-                throw new \Exception("Failed: Library couldn't be dowloaded");
-            }
-            $extracted = false;
-            $zip_offset = \substr($s = $zip->getNameIndex(0), 0, \strpos($s, '/'));
-            $sub_offset = "{$zip_offset}/{$m_path}";
-            for ($i = 0; $i < $zip->numFiles; $i++) {
-                $fileName = $zip->getNameIndex($i);
-                if (\str_starts_with($fileName, $sub_offset)) {
-                    $target_path = $m_dir.substr($fileName, strlen($sub_offset));
-                    if (str_ends_with($fileName, '/')) {
-                        is_dir($target_path) OR @mkdir($target_path, 0777, true);
-                    } else {
-                        is_dir(dirname($target_path)) OR @mkdir($d, 0777, true);
-                        file_put_contents($target_path, $zip->getFromIndex($i));
-                    }
-                    $extracted = true;
-                }
-            }
-            if(!$extracted){
-                throw new \Exception("Failed: Library couldn't be extracted");
-            }    
-        } finally {
-            $zip->close();
-        }
-        
-        return $m_dir;
-    }    
-    
-    
     public function __invoke(){
         $this->build_request();
         $this->VERBOSITY = $_REQUEST['--verbose'] ?? false;
         \set_include_path($this->TSP_PATH);
         if(($key = \array_key_first($_REQUEST)) === 0){
-            $intfc = $this->INTFC;
+            $access = $this->INTFC.$this->PANEL;
+            $panel = $this->PANEL;
             $path = \trim('__'.($_REQUEST['-p'] ?? null ?? '').'/'.\trim($_REQUEST[0] ?? '', '/'), '/');
+            $search = [];
             if(
-                ($file = \stream_resolve_include_path("{$path}/-@{$intfc}.php"))
-                || ($file = \stream_resolve_include_path("{$path}-@{$intfc}.php"))
-                || ($file = \stream_resolve_include_path("{$path}/-@.php"))
-                || ($file = \stream_resolve_include_path("{$path}-@.php"))
+                ($file = \stream_resolve_include_path($search[]= "{$path}/-@{$access}.php"))
+                || ($file = \stream_resolve_include_path($search[]= "{$path}-@{$access}.php"))
+                || ($file = \stream_resolve_include_path($search[]= "{$path}/-@{$panel}.php"))
+                || ($file = \stream_resolve_include_path($search[]= "{$path}-@{$panel}.php"))
             ){ 
                 (function() use($file){
                     (function(){

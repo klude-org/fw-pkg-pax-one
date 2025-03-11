@@ -46,16 +46,20 @@ for /f "tokens=2 delims==" %%a in ('wmic os get localdatetime /value') do set dt
 set "%~1=%dt:~0,8%-%dt:~8,4%-%dt:~12,2%%dt:~15,3%-%dt:~6,2%%dt:~8,2%%dt:~10,2%-%dt:~15,3%%dt:~12,2%%dt:~6,2%"
 exit /b
 :loadCONFIG
-    if not exist %~dp0.local mkdir %~dp0.local
-    if not exist "%~dp0.local\.config.bat" (
-        echo SET FX__PHP_EXEC_STD_PATH=C:/xampp/current/php/php.exe > "%~dp0.local\.config.bat"
-        echo SET FX__PHP_EXEC_XDBG_PATH=C:/xampp/current/php__xdbg/php.exe >> "%~dp0.local\.config.bat"
-        echo SET FX__ENV_FILE="%~dp0.local\___set_cli_env_vars__.bat" >> "%~dp0.local\.config.bat"
-        echo SET FX__DEBUG=0 >> "%~dp0.local\.config.bat"
-        echo SET FX__CONFIG_LOADED=1 >> "%~dp0.local\.config.bat"
+    if not exist %FX__LOCAL_DIR% mkdir %FX__LOCAL_DIR%
+    if not exist "%FX__LOCAL_DIR%\.config.bat" (
+        echo SET FX__PHP_EXEC_STD_PATH=C:/xampp/current/php/php.exe > "%FX__LOCAL_DIR%\.config.bat"
+        echo SET FX__PHP_EXEC_XDBG_PATH=C:/xampp/current/php__xdbg/php.exe >> "%FX__LOCAL_DIR%\.config.bat"
+        echo SET FX__ENV_FILE="%FX__LOCAL_DIR%\___set_cli_env_vars__.bat" >> "%FX__LOCAL_DIR%\.config.bat"
+        echo SET FX__DEBUG=0 >> "%FX__LOCAL_DIR%\.config.bat"
+        echo SET FX__CONFIG_LOADED=1 >> "%FX__LOCAL_DIR%\.config.bat"
     )
-    call %~dp0.local\.config.bat
+    call %FX__LOCAL_DIR%\.config.bat
 :L__START
+
+::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+:: LIB DIR
+if not defined FX__LOCAL_DIR  SET "FX__LOCAL_DIR=%~dp0\..\.local"
 
 ::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 :: LIB DIR
@@ -72,7 +76,7 @@ if not defined FX__CONFIG_LOADED call :loadCONFIG
 ::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 :: PATH
 if not defined FY__ORIGINAL_PATH SET "FY__ORIGINAL_PATH=%Path%"
-SET PATH=%~dp0;%FY__ORIGINAL_PATH%
+SET PATH=%~dp0cmd;%FY__ORIGINAL_PATH%
 
 ::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 :: SHELL
@@ -101,8 +105,8 @@ if defined FW__ENV_FILE (
     SET "FW__ENV_FILE=%FX__ENV_FILE%"
 )
 
-SET CMD_FILE_A=%~dp0__\%1\-@cli%FY__AGENT%.bat
-SET CMD_FILE_B=%~dp0__\%1-@cli%FY__AGENT%.bat
+SET CMD_FILE_A=%~dp0__\%1\-@cli%FY__PANEL%.bat
+SET CMD_FILE_B=%~dp0__\%1-@cli%FY__PANEL%.bat
 
 if exist "%CMD_FILE_A%" (
     call %CMD_FILE_B% %*
