@@ -18,7 +18,9 @@ class origin extends \stdClass {
     
     public int|bool|null $VERBOSITY = null;
     
-    public function __construct(){
+    public static function _() { static $i;  return $i ?: ($i = new static()); }
+    
+    protected function __construct(){
         $this->ENV_VARS = $_ENV;
         $_ENV = $this;
         $this->config($_);
