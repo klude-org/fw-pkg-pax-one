@@ -52,23 +52,21 @@ class origin extends \stdClass {
                 ...\iterator_to_array((function(){
                     global $_;
                     foreach([
-                        $this->_['*']['modules'] ?? [],
-                        $this->_[$this->INTFC]['modules'] ?? [],
-                        $this->_[$this->INTFC.$this->PANEL]['modules'] ?? [],
-                    ] as $m){
-                        foreach($m as $expr => $en){
-                            if($en){
-                                $found = false;
-                                if($f = $this->resolve_module($expr, $en)){
-                                    $found = true;
-                                    yield \str_replace('\\','/', \realpath($f)) => true;
-                                }
-                                if(!$found){
-                                    $this->TRACE[] = "!!! Module Not Found: '{$expr}'";
-                                }
-                            } else {
-                                $this->TRACE[] = "??? Module Disabled '{$expr}'";   
+                        ...($this->_['*']['modules'] ?? []),
+                        ...($this->_[$this->INTFC]['modules'] ?? []),
+                        ...($this->_[$this->INTFC.$this->PANEL]['modules'] ?? []),
+                    ] as $expr => $en){
+                        if($en){
+                            $found = false;
+                            if($f = $this->resolve_module($expr, $en)){
+                                $found = true;
+                                yield \str_replace('\\','/', \realpath($f)) => true;
                             }
+                            if(!$found){
+                                $this->TRACE[] = "!!! Module Not Found: '{$expr}'";
+                            }
+                        } else {
+                            $this->TRACE[] = "??? Module Disabled '{$expr}'";   
                         }
                     }
                 })()),
@@ -228,10 +226,10 @@ class origin extends \stdClass {
             global $_;
             yield $this->INCP_DIR => true;
             foreach([
-                $this->_['*']['libraries'] ?? [],
-                $this->_[$this->INTFC]['libraries'] ?? [],
-                $this->_[$this->INTFC.$this->PANEL]['libraries'] ?? [],
-            ] ?? [] as $dx => $en){
+                ...($this->_['*']['libraries'] ?? []),
+                ...($this->_[$this->INTFC]['libraries'] ?? []),
+                ...($this->_[$this->INTFC.$this->PANEL]['libraries'] ?? []),
+            ] as $dx => $en){
                 if($en){
                     if(\is_dir($dx)){
                         yield \str_replace('\\','/', \realpath($dx)) => true;
