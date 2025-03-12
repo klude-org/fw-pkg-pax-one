@@ -1,1 +1,0 @@
-curl -o ".local-%~n0.zip" "https://raw.githubusercontent.com/klude-org/fw-pkg-pax-one/main/releases/%~n0.zip"
