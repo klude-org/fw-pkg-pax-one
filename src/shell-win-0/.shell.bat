@@ -59,11 +59,11 @@ exit /b
 
 ::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 :: LIB DIR
-if not defined FX__LOCAL_DIR  SET "FX__LOCAL_DIR=%~dp0\..\..\.local"
+if not defined FX__LOCAL_DIR  SET "FX__LOCAL_DIR=%~dp0..\.local"
 
 ::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 :: LIB DIR
-if not defined FX__LIB_DIR  SET "FX__LIB_DIR=%~dp0\..\.."
+if not defined FX__LIB_DIR  SET "FX__LIB_DIR=%~dp0.."
 
 ::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 :: SESSION
@@ -134,5 +134,5 @@ exit /b 0
 
 <?php endif; 
 
-include __DIR__.'/../.start.php';
+include __DIR__.'/../index.php';
 
